@@ -1,0 +1,60 @@
+{
+  "name": "velt/orm",
+  "description": "Active record ORM layer for the Velt framework.",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "velt/database": "dev-main"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Velt\\Orm\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Velt\\Orm\\Tests\\": "tests/"
+    }
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../velt-database",
+      "options": {
+        "symlink": true,
+        "versions": {
+          "velt/database": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../veltphp-kernel/packages/kernel",
+      "options": {
+        "symlink": true,
+        "versions": {
+          "velt/kernel": "dev-main"
+        }
+      }
+    },
+    {
+      "type": "path",
+      "url": "../velt-ui",
+      "options": {
+        "symlink": true,
+        "versions": {
+          "velt/ui": "dev-main"
+        }
+      }
+    }
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "scripts": {
+    "test": "phpunit --colors=always"
+  }
+}
