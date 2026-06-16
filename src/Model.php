@@ -75,6 +75,7 @@ abstract class Model implements JsonSerializable
      */
     public static function hydrate(array $attributes): static
     {
+        // Hydration restores database rows as-is; mass assignment rules only apply to user-provided input.
         $model = new static();
         $model->attributes = $attributes;
         $model->original = $attributes;
@@ -107,6 +108,7 @@ abstract class Model implements JsonSerializable
                 throw new LogicException(sprintf('%s cannot be updated without primary key "%s".', static::class, $key));
             }
 
+            // Existing models only write changed attributes, keeping updates small and predictable.
             $dirty = $this->dirtyAttributes();
 
             if ($dirty === []) {
@@ -228,6 +230,7 @@ abstract class Model implements JsonSerializable
 
     protected function isFillable(string $key): bool
     {
+        // If a model declares fillable fields, only those fields can be mass assigned.
         if (static::$fillable !== []) {
             return in_array($key, static::$fillable, true);
         }

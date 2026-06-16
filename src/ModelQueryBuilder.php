@@ -76,6 +76,7 @@ final class ModelQueryBuilder
             $query->limit($this->limit);
         }
 
+        // Convert database rows into active model instances at the ORM boundary.
         return array_map(
             fn (array $row): Model => $this->modelClass::hydrate($row),
             $query->get(),
@@ -104,6 +105,7 @@ final class ModelQueryBuilder
 
         $total = count($countQuery->get());
         $offset = ($page - 1) * $perPage;
+        // MVP pagination slices hydrated rows until the database query builder exposes offset().
         $rows = array_slice($this->get(), $offset, $perPage);
 
         return new Paginator($rows, $page, $total, $perPage);
