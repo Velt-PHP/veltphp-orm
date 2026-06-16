@@ -29,6 +29,7 @@ final class ModelQueryBuilder
     {
         $operator = '=';
 
+        // Supporte where('email', $email) et where('age', '>=', 18).
         if (func_num_args() >= 3) {
             $operator = (string) $operatorOrValue;
         } else {
@@ -76,6 +77,7 @@ final class ModelQueryBuilder
             $query->limit($this->limit);
         }
 
+        // Convertit les lignes database en instances de model a la frontiere ORM.
         return array_map(
             fn (array $row): Model => $this->modelClass::hydrate($row),
             $query->get(),
@@ -104,6 +106,7 @@ final class ModelQueryBuilder
 
         $total = count($countQuery->get());
         $offset = ($page - 1) * $perPage;
+        // Pagination MVP: on decoupe en PHP tant que le query builder database n'a pas offset().
         $rows = array_slice($this->get(), $offset, $perPage);
 
         return new Paginator($rows, $page, $total, $perPage);
@@ -113,6 +116,7 @@ final class ModelQueryBuilder
     {
         $query = DB::table($this->modelClass::tableName());
 
+        // Rejoue les contraintes ORM stockees sur le query builder database.
         foreach ($this->wheres as $where) {
             $query->where($where['column'], $where['operator'], $where['value']);
         }
