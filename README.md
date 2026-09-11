@@ -4,7 +4,7 @@ Velt ORM fournit la couche Active Record du framework Velt. Il transforme les li
 
 Le package privilégie une surface réduite et lisible. Il ne réimplémente pas PDO, les migrations ou le compilateur SQL : ces responsabilités appartiennent à [`velt/database`](https://github.com/Velt-PHP/velt-database).
 
-> Statut : préversion. L’API de base est opérationnelle, mais les relations avancées, les casts, les événements et les garanties de performance doivent être stabilisés avant `1.0`.
+> Statut : préversion. Les casts, la pagination SQL et la sérialisation de base sont disponibles ; l’eager loading batché, les événements et la matrice multi-SGBD restent à stabiliser avant `1.0`.
 
 ## Installation
 
@@ -27,12 +27,33 @@ final class User extends Model
 {
     protected static string $table = 'users';
 
+    protected static array $relations = [
+        'posts' => [
+            'type' => 'hasMany',
+            'related' => Post::class,
+            'foreignKey' => 'user_id',
+        ],
+    ];
+
     protected static array $fillable = [
         'name',
         'email',
     ];
 }
 ```
+
+Pour charger cette relation en batch, utilisez `with()`. Le builder exécute
+une requête liée `IN (...)` pour la collection, puis rattache les modèles sans
+exécuter la méthode de relation pour chaque ligne :
+
+```php
+$users = User::query()->with('posts')->get();
+```
+
+Les relations demandées par `with()` doivent avoir une entrée dans
+`$relations`; l’ORM lève une `LogicException` si elle manque au lieu de
+retomber silencieusement sur un N+1. `hasOne` et `belongsTo` utilisent la même
+forme avec `type` correspondant et, si nécessaire, `ownerKey` ou `localKey`.
 
 ```php
 $user = User::find(1);
@@ -126,6 +147,25 @@ echo $user->name;
 $user->email = 'new@example.com';
 ```
 
+Les casts sont déclarés explicitement et s’appliquent à l’hydratation comme à la
+persistance :
+
+```php
+protected static array $casts = [
+    'active' => 'bool',
+    'score' => 'float',
+    'settings' => 'json',
+    'published_at' => 'datetime',
+];
+```
+
+Les types supportés sont `bool`, `int`, `float`, `json`, `date` et `datetime`.
+`isDirty()` et `getDirty()` permettent d’observer les modifications avant un
+`save()`. Les timestamps sont opt-in avec `protected static bool $timestamps = true`
+et utilisent `created_at`/`updated_at` par défaut; les noms sont personnalisables.
+`$hidden` exclut des champs de `toArray()`, tandis que `$visible` définit une
+liste blanche. La sérialisation des relations déjà chargées coupe les cycles.
+
 Pour une API, sérialisez uniquement les champs que le contrat public autorise. Ne retournez pas mécaniquement tous les attributs d’une table contenant mots de passe, jetons ou informations personnelles.
 
 ## Relations
@@ -158,7 +198,10 @@ final class Post extends Model
 }
 ```
 
-Les relations actuelles sont chargées explicitement. Pour éviter le problème N+1, mesurez le nombre de requêtes et utilisez une requête adaptée lorsque vous parcourez une collection importante. Le chargement anticipé et les relations plusieurs-à-plusieurs font partie des travaux restant à stabiliser.
+Les relations actuelles sont chargées explicitement. Le chargement anticipé
+batché est disponible pour `hasMany`, `hasOne` et `belongsTo`. Les relations
+plusieurs-à-plusieurs et la détection automatique des accès lazy restent à
+stabiliser; une collection importante doit donc être mesurée.
 
 ## Pagination
 
@@ -259,9 +302,38 @@ La matrice cible couvre :
 - rollback transactionnel ;
 - SQLite, MySQL et PostgreSQL dans les tests d’intégration.
 
+Les tests multi-moteurs utilisent `ORM_DB_DRIVER` (`sqlite`, `mysql` ou
+`pgsql`) et, pour une base distante, `ORM_DB_HOST`, `ORM_DB_PORT`,
+`ORM_DB_DATABASE`, `ORM_DB_USERNAME` et `ORM_DB_PASSWORD`. Exemple :
+
+```bash
+$env:ORM_DB_DRIVER = 'mysql'
+$env:ORM_DB_HOST = '127.0.0.1'
+$env:ORM_DB_PORT = '3306'
+$env:ORM_DB_DATABASE = 'velt_test'
+$env:ORM_DB_USERNAME = 'root'
+$env:ORM_DB_PASSWORD = 'password'
+vendor/bin/phpunit -c phpunit.xml
+```
+
+Un pilote absent est marqué comme skip par la suite; la preuve de release doit
+exécuter chaque variante sur un runner disposant réellement du pilote et du
+serveur correspondant.
+
 ## Performance
 
 Active Record privilégie la commodité. Pour des imports massifs ou agrégations complexes, le query builder de `velt/database` est souvent plus approprié. Toute optimisation doit être étayée par un benchmark reproductible et conserver les requêtes préparées.
+
+Le benchmark d’hydratation mesure le temps et la mémoire d’une liste de taille
+contrôlée :
+
+```bash
+php benchmarks/hydration.php 10000
+```
+
+Il doit être exécuté avec les versions PHP et dépendances de la CI de release.
+Les valeurs sont des observations de régression, pas un seuil universel entre
+machines différentes.
 
 ## Sécurité
 
@@ -278,11 +350,9 @@ Le package suit SemVer. Avant `1.0`, toute préversion peut encore ajuster son A
 
 ## Limites avant une version stable
 
-- casts typés et dates non finalisés ;
 - événements de modèle et observers absents ;
-- eager loading et prévention automatique du N+1 absents ;
+- détection automatique des accès lazy et relations many-to-many absentes ;
 - relations many-to-many non stabilisées ;
-- stratégie de sérialisation sensible à formaliser ;
 - matrice MySQL/PostgreSQL à automatiser en CI.
 
 ## Contribution

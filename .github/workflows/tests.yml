@@ -1,0 +1,73 @@
+name: ORM tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }} / ${{ matrix.database }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+        database: [sqlite, mysql, pgsql]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: velt_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: velt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d velt_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      ORM_DB_DRIVER: ${{ matrix.database }}
+      ORM_DB_HOST: 127.0.0.1
+      ORM_DB_DATABASE: velt_test
+      ORM_DB_USERNAME: ${{ matrix.database == 'mysql' && 'root' || 'postgres' }}
+      ORM_DB_PASSWORD: password
+      ORM_DB_PORT: ${{ matrix.database == 'mysql' && '3306' || '5432' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Velt-PHP/velt-database
+          path: velt-database
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo, pdo_sqlite, pdo_mysql, pdo_pgsql
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Validate manifest
+        run: composer validate --strict
+
+      - name: Run ORM tests
+        run: composer test
+
+      - name: Run hydration benchmark
+        if: matrix.database == 'sqlite' && matrix.php == '8.4'
+        run: php benchmarks/hydration.php 10000
